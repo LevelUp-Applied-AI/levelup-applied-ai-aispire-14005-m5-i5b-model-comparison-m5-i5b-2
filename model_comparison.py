@@ -1,166 +1,333 @@
 """
-Module 5 Week B — Integration: Model Comparison & Decision Memo
+Module 5 Week B — Integration Task: Model Comparison & Decision Memo
 
-Module 5 culminating deliverable. Compare 6 model configurations,
-produce PR curves, calibration plots, an experiment log, and a
-decision memo.
+Module 5 culminating deliverable. Compare 6 model configurations using
+5-fold stratified cross-validation, produce PR curves and calibration
+plots, log experiments, persist the best model, and demonstrate what
+tree-based models capture that linear models cannot.
+
+Complete the 9 functions below. See the integration guide for task-by-task
+detail.
+Run with:  python model_comparison.py
+Tests:     pytest tests/ -v
 """
 
-import pandas as pd
-import numpy as np
+import os
 from datetime import datetime
-from sklearn.model_selection import cross_validate, StratifiedKFold
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.dummy import DummyClassifier
-from sklearn.metrics import (average_precision_score, PrecisionRecallDisplay,
-                             make_scorer)
-from sklearn.calibration import CalibrationDisplay
-from joblib import dump
+
+# Use a non-interactive matplotlib backend so plots save cleanly in CI
+# and on headless environments.
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+import numpy as np
+import pandas as pd
+from joblib import dump
+from sklearn.calibration import CalibrationDisplay
+from sklearn.compose import ColumnTransformer
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (PrecisionRecallDisplay, average_precision_score,
+                             make_scorer, precision_score, recall_score,
+                             f1_score, accuracy_score)
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 
 
 NUMERIC_FEATURES = ["tenure", "monthly_charges", "total_charges",
                     "num_support_calls", "senior_citizen",
                     "has_partner", "has_dependents", "contract_months"]
 
-CATEGORICAL_FEATURES = ["gender", "contract_type", "internet_service",
-                        "payment_method"]
 
+def load_and_preprocess(filepath="data/telecom_churn.csv", random_state=42):
+    """Load the Petra Telecom dataset and split into train/test sets.
 
-def load_and_prepare(filepath="data/telecom_churn.csv"):
-    """Load data and separate features from target.
+    Uses an 80/20 stratified split. Features are the 8 NUMERIC_FEATURES
+    columns. Target is `churned`.
 
-    Returns:
-        Tuple of (X, y).
-    """
-    # TODO: Load CSV, drop customer_id, separate X and y
-    pass
-
-
-def build_preprocessor():
-    """Build a ColumnTransformer for mixed feature types.
+    Args:
+        filepath: Path to telecom_churn.csv.
+        random_state: Random seed for reproducible split.
 
     Returns:
-        ColumnTransformer.
+        Tuple (X_train, X_test, y_train, y_test) where X contains only
+        NUMERIC_FEATURES and y is the `churned` column.
     """
-    # TODO: StandardScaler for numeric, OneHotEncoder for categorical
+    # TODO: Load the CSV, select NUMERIC_FEATURES into X, use `churned` as y,
+    #       split 80/20 with stratify=y.
     pass
 
 
 def define_models():
-    """Define 6 model configurations as Pipelines.
+    """Define 6 model configurations for comparison.
+
+    The pattern is deliberate: a default vs class_weight='balanced' pair
+    at BOTH the linear and ensemble family levels. This lets you observe
+    the class_weight effect at two levels of model complexity.
+
+    The 6 configurations:
+      1. DummyClassifier(strategy='most_frequent') — baseline
+      2. LogisticRegression(max_iter=1000) — linear default (needs scaling)
+      3. LogisticRegression(class_weight='balanced', max_iter=1000) — linear balanced (needs scaling)
+      4. DecisionTreeClassifier(max_depth=5) — tree baseline
+      5. RandomForestClassifier(n_estimators=100, max_depth=10) — ensemble default
+      6. RandomForestClassifier(n_estimators=100, max_depth=10, class_weight='balanced') — ensemble balanced
+
+    LR variants require StandardScaler preprocessing; tree-based models
+    do not. Use sklearn Pipeline to pair each model with its preprocessing.
 
     Returns:
-        Dictionary of {name: Pipeline}.
+        Dict of {name: sklearn.pipeline.Pipeline} with 6 entries.
+        Names: 'Dummy', 'LR_default', 'LR_balanced', 'DT_depth5',
+               'RF_default', 'RF_balanced'.
     """
-    # TODO: Create 6 Pipelines:
-    #   1. "LogReg_default"
-    #   2. "LogReg_L1" (C=0.1, solver='saga', max_iter=1000)
-    #   3. "DecisionTree"
-    #   4. "RandomForest_default"
-    #   5. "RandomForest_balanced"
-    #   6. "Dummy_baseline"
+    # TODO: Build a Pipeline for each model. LR pipelines include
+    #       StandardScaler; tree pipelines use 'passthrough' for the
+    #       scaler step. All models with randomness use random_state=42.
     pass
 
 
-def evaluate_all(models, X, y, cv=5, random_state=42):
-    """Cross-validate all models and return results DataFrame.
+def run_cv_comparison(models, X, y, n_splits=5, random_state=42):
+    """Run 5-fold stratified cross-validation on all models.
+
+    For each model, compute mean and std of: accuracy, precision, recall,
+    F1, and PR-AUC across folds. PR-AUC uses predict_proba — it is a
+    threshold-independent ranking metric.
+
+    Args:
+        models: Dict of {name: Pipeline} from define_models().
+        X: Feature DataFrame.
+        y: Target Series.
+        n_splits: Number of CV folds.
+        random_state: Random seed for StratifiedKFold.
 
     Returns:
-        DataFrame with: model, accuracy_mean, accuracy_std,
-        precision_mean, recall_mean, f1_mean, pr_auc_mean.
+        DataFrame with columns: model, accuracy_mean, accuracy_std,
+        precision_mean, precision_std, recall_mean, recall_std,
+        f1_mean, f1_std, pr_auc_mean, pr_auc_std.
+        One row per model (6 rows total).
     """
-    # TODO: Loop over models, run cross_validate with multiple scoring metrics
+    # TODO: Create a StratifiedKFold splitter. For each model, loop over
+    #       folds: fit on train, predict on val, compute the 5 metrics.
+    #       Collect fold scores, compute mean ± std. Return as DataFrame.
     pass
 
 
-def save_results(results_df, output_dir="results"):
-    """Save comparison table to CSV.
+def save_comparison_table(results_df, output_path="results/comparison_table.csv"):
+    """Save the comparison table to CSV.
 
     Args:
-        results_df: Results DataFrame.
-        output_dir: Directory for output files.
+        results_df: DataFrame from run_cv_comparison().
+        output_path: Destination path.
     """
-    # TODO: Save results_df to comparison_table.csv
+    # TODO: Save results_df to CSV (with index=False).
     pass
 
 
-def plot_pr_curves(models, X, y, top_n=3, output_dir="results"):
-    """Plot PR curves for the top N models and save.
+def plot_pr_curves_top3(models, X_test, y_test, output_path="results/pr_curves.png"):
+    """Plot PR curves for the top 3 models (by PR-AUC) on one axes and save.
+
+    The top 3 are determined by fitting each model on training data and
+    evaluating PR-AUC on the test set. Plot uses
+    PrecisionRecallDisplay.from_estimator.
 
     Args:
-        models: Dict of {name: Pipeline}.
-        X, y: Full dataset (uses train/test split internally).
-        top_n: Number of top models to plot.
-        output_dir: Directory for output files.
+        models: Dict of {name: fitted Pipeline} — must already be fitted.
+        X_test: Test features.
+        y_test: Test labels.
+        output_path: Destination path for the PNG.
     """
-    # TODO: Train models, plot PR curves, save to pr_curves.png
+    # TODO: Compute PR-AUC for each model on the test set. Select the top 3.
+    #       Create a figure, plot each with PrecisionRecallDisplay.from_estimator
+    #       on the same axes. Title, save, close.
     pass
 
 
-def plot_calibration(models, X, y, top_n=3, output_dir="results"):
-    """Plot calibration diagram for top N models and save.
+def plot_calibration_top3(models, X_test, y_test, output_path="results/calibration.png"):
+    """Plot calibration curves for the top 3 models and save.
+
+    Uses CalibrationDisplay.from_estimator.
 
     Args:
-        models: Dict of {name: Pipeline}.
-        X, y: Full dataset.
-        top_n: Number of top models to plot.
-        output_dir: Directory for output files.
+        models: Dict of {name: fitted Pipeline} — must already be fitted.
+        X_test: Test features.
+        y_test: Test labels.
+        output_path: Destination path for the PNG.
     """
-    # TODO: Train models, plot calibration curves, save to calibration.png
+    # TODO: Same top 3 as PR curves. Create a figure, plot each with
+    #       CalibrationDisplay.from_estimator. Title, save, close.
     pass
 
 
-def save_best_model(models, results_df, X, y, output_dir="results"):
-    """Save the best model using joblib.
+def save_best_model(best_model, output_path="results/best_model.joblib"):
+    """Persist the best model to disk with joblib.
 
     Args:
-        models: Dict of {name: Pipeline}.
-        results_df: Results with model rankings.
-        X, y: Full dataset for final training.
-        output_dir: Directory for output files.
+        best_model: A fitted sklearn Pipeline.
+        output_path: Destination path.
     """
-    # TODO: Identify best model from results, train on full data, save with joblib
+    # TODO: Call dump(best_model, output_path).
     pass
 
 
-def log_experiment(results_df, output_dir="results"):
-    """Save experiment log to CSV with timestamps.
+def log_experiment(results_df, output_path="results/experiment_log.csv"):
+    """Log all model results with timestamps.
+
+    Produces a CSV with columns: model_name, accuracy, precision, recall,
+    f1, pr_auc, timestamp. One row per model. The timestamp records WHEN
+    the experiment was run (ISO format).
 
     Args:
-        results_df: Results DataFrame.
-        output_dir: Directory for output files.
+        results_df: DataFrame from run_cv_comparison().
+        output_path: Destination path.
     """
-    # TODO: Add timestamp column and save to experiment_log.csv
+    # TODO: Build a log DataFrame with columns: model_name, accuracy,
+    #       precision, recall, f1, pr_auc (use the mean values from
+    #       results_df), and a timestamp column with the current time.
+    #       Save to CSV.
     pass
+
+
+def find_tree_vs_linear_disagreement(rf_model, lr_model, X_test, y_test,
+                                     feature_names, min_diff=0.15):
+    """Find ONE test sample where RF and LR predicted probabilities differ most.
+
+    The tree-vs-linear capability demonstration. The random forest can
+    capture feature interactions, non-monotonic relationships, and threshold
+    effects that a linear model cannot express with per-feature coefficients.
+    Finding a sample where the two models disagree — and explaining WHY in
+    structural terms — is evidence that trees have capabilities linear models
+    don't, regardless of aggregate PR-AUC.
+
+    Both models are Pipelines (preprocessing included), so both accept the
+    same raw X_test input.
+
+    Args:
+        rf_model: Fitted RF Pipeline (from define_models, already fitted).
+        lr_model: Fitted LR Pipeline (from define_models, already fitted).
+        X_test: Test features DataFrame (raw — pipelines handle scaling).
+        y_test: True labels for the test set.
+        feature_names: List of feature name strings.
+        min_diff: Minimum probability difference to count as disagreement.
+
+    Returns:
+        Dict with keys:
+          - sample_idx (int): test-set row index of the selected sample
+          - feature_values (dict): {name: value} for the sample's features
+          - rf_proba (float): RF Pipeline's predicted P(churn=1)
+          - lr_proba (float): LR Pipeline's predicted P(churn=1)
+          - prob_diff (float): |rf_proba - lr_proba|
+          - true_label (int): 0 or 1
+    """
+    # TODO: Get predict_proba from both pipelines on X_test. Compute
+    #       absolute difference of P(churn=1). Find the sample with the
+    #       MAXIMUM difference (must be >= min_diff). Return the dict
+    #       with all six fields.
+    pass
+
+
+def main():
+    """Orchestrate all 9 integration tasks. Run with: python model_comparison.py"""
+    os.makedirs("results", exist_ok=True)
+
+    # Task 1: Load + split
+    result = load_and_preprocess()
+    if not result:
+        print("load_and_preprocess not implemented. Exiting.")
+        return
+    X_train, X_test, y_train, y_test = result
+    print(f"Data: {len(X_train)} train, {len(X_test)} test, "
+          f"churn rate: {y_train.mean():.2%}")
+
+    # Task 2: Define models
+    models = define_models()
+    if not models:
+        print("define_models not implemented. Exiting.")
+        return
+    print(f"\n{len(models)} model configurations defined: {list(models.keys())}")
+
+    # Task 3: Cross-validation comparison
+    results_df = run_cv_comparison(models, X_train, y_train)
+    if results_df is None:
+        print("run_cv_comparison not implemented. Exiting.")
+        return
+    print("\n=== Model Comparison Table (5-fold CV) ===")
+    print(results_df.to_string(index=False))
+
+    # Task 4: Save comparison table
+    save_comparison_table(results_df)
+
+    # Fit all models on full training set for plots + persistence
+    fitted_models = {}
+    for name, pipeline in models.items():
+        pipeline.fit(X_train, y_train)
+        fitted_models[name] = pipeline
+
+    # Task 5: PR curves (top 3)
+    plot_pr_curves_top3(fitted_models, X_test, y_test)
+
+    # Task 6: Calibration plot (top 3)
+    plot_calibration_top3(fitted_models, X_test, y_test)
+
+    # Task 7: Save best model
+    best_name = results_df.sort_values("pr_auc_mean", ascending=False).iloc[0]["model"]
+    print(f"\nBest model by PR-AUC: {best_name}")
+    save_best_model(fitted_models[best_name])
+
+    # Task 8: Experiment log
+    log_experiment(results_df)
+
+    # Task 9: Tree-vs-linear disagreement
+    rf_pipeline = fitted_models["RF_default"]
+    lr_pipeline = fitted_models["LR_default"]
+    disagreement = find_tree_vs_linear_disagreement(
+        rf_pipeline, lr_pipeline, X_test, y_test, NUMERIC_FEATURES
+    )
+    if disagreement:
+        print(f"\n--- Tree-vs-linear disagreement (sample idx={disagreement['sample_idx']}) ---")
+        print(f"  RF P(churn=1)={disagreement['rf_proba']:.3f}  "
+              f"LR P(churn=1)={disagreement['lr_proba']:.3f}")
+        print(f"  |diff| = {disagreement['prob_diff']:.3f}   "
+              f"true label = {disagreement['true_label']}")
+
+        # Save disagreement analysis to markdown
+        md_lines = [
+            "# Tree vs. Linear Disagreement Analysis",
+            "",
+            "## Sample Details",
+            "",
+            f"- **Test-set index:** {disagreement['sample_idx']}",
+            f"- **True label:** {disagreement['true_label']}",
+            f"- **RF predicted P(churn=1):** {disagreement['rf_proba']:.4f}",
+            f"- **LR predicted P(churn=1):** {disagreement['lr_proba']:.4f}",
+            f"- **Probability difference:** {disagreement['prob_diff']:.4f}",
+            "",
+            "## Feature Values",
+            "",
+        ]
+        for feat, val in disagreement["feature_values"].items():
+            md_lines.append(f"- **{feat}:** {val}")
+        md_lines.extend([
+            "",
+            "## Structural Explanation",
+            "",
+            "<!-- Write 2-3 sentences explaining WHY these models disagree on this",
+            "     sample. Point to a specific feature interaction, non-monotonic",
+            "     relationship, or threshold effect the tree captured that the",
+            "     linear model could not. -->",
+            "",
+        ])
+        with open("results/tree_vs_linear_disagreement.md", "w") as f:
+            f.write("\n".join(md_lines))
+        print("  Saved to results/tree_vs_linear_disagreement.md")
+
+    print("\n--- All results saved to results/ ---")
+    print("Write your decision memo in the PR description (Task 10).")
 
 
 if __name__ == "__main__":
-    import os
-    os.makedirs("results", exist_ok=True)
-
-    data = load_and_prepare()
-    if data:
-        X, y = data
-        print(f"Data: {X.shape[0]} rows, churn rate: {y.mean():.2%}")
-
-        models = define_models()
-        if models:
-            results = evaluate_all(models, X, y)
-            if results is not None:
-                print("\n=== Model Comparison Table ===")
-                print(results.to_string(index=False))
-
-                save_results(results)
-                plot_pr_curves(models, X, y)
-                plot_calibration(models, X, y)
-                save_best_model(models, results, X, y)
-                log_experiment(results)
-
-                print("\nResults saved to results/")
-                print("Write your decision memo in the PR description.")
+    main()
