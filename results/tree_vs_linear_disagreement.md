@@ -26,3 +26,21 @@ The Random Forest assigns high churn risk here because it can model a threshold 
 Logistic Regression assumes a monotone, additive relationship between each feature and log-odds of churn, so it under-weights the joint region (low tenure AND high charges AND high calls) that the forest partitions explicitly via splits.
 
 This non-monotonic, interaction-driven risk zone is exactly the type of pattern tree ensembles are designed to capture, and it explains why RF yields higher PR-AUC on this imbalanced dataset.
+
+---
+
+## Tier 1: Threshold Recommendation
+
+The retention team can contact at most **150 customers per month** across a 10,000-customer base (1.5% contact rate).
+
+After sweeping thresholds from 0.10 to 0.90 on the best model (`RF_default`), the recommended deployment threshold is **0.70**:
+
+| Metric | Value |
+|--------|-------|
+| Threshold | 0.70 |
+| Precision | 0.778 |
+| Recall | 0.048 |
+| F1 | 0.090 |
+| Projected monthly alerts | 100 / 10,000 |
+
+**Operational implications:** This threshold keeps the alert volume within the team's monthly capacity while maximising recall — i.e., catching as many true churners as possible before they leave. Precision at this threshold means roughly 1 in 1 alerted customers is a genuine churn risk; the rest receive a retention offer unnecessarily. If the cost of a false alarm (wasted retention offer) is low relative to the cost of a missed churner (lost revenue), this tradeoff is operationally justified.
